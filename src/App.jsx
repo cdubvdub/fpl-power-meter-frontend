@@ -9,6 +9,10 @@ function App() {
   const [file, setFile] = useState(null)
   const [jobId, setJobId] = useState('')
   const [batchResults, setBatchResults] = useState([])
+  const [error, setError] = useState(null)
+
+  // Clear any errors when starting new operations
+  const clearError = () => setError(null)
 
   // Load saved credentials on component mount
   useEffect(() => {
@@ -72,26 +76,45 @@ function App() {
   }
 
   async function submitBatch(e) {
+    console.log('submitBatch called')
     e.preventDefault()
-    setBusy(true)
-    setBatchResults([])
-    setJobId('')
+    
     try {
+      console.log('Setting busy state')
+      setBusy(true)
+      setBatchResults([])
+      setJobId('')
+      
+      console.log('Form data:', { username: form.username, tin: form.tin, file: file?.name })
+      
       // Save credentials for future use
+      console.log('Saving credentials')
       saveCredentials(form.username, form.tin)
       
+      console.log('Creating FormData')
       const fd = new FormData()
       fd.append('username', form.username)
       fd.append('password', form.password)
       fd.append('tin', form.tin)
       fd.append('file', file)
+      
+      console.log('Making API request to:', `${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/batch`)
       const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/batch`, { method: 'POST', body: fd })
+      
+      console.log('Response status:', res.status)
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`)
+      }
+      
+      console.log('Parsing response JSON')
       const data = await res.json()
       console.log('Batch response:', data) // Debug log
       
       if (data?.jobId) {
+        console.log('Job ID received:', data.jobId)
         setJobId(data.jobId)
         // poll results every 2s until completed
+        console.log('Starting polling')
         pollResults(data.jobId)
       } else {
         console.error('No jobId in response:', data)
@@ -99,6 +122,7 @@ function App() {
       }
     } catch (err) {
       console.error('Batch submission error:', err)
+      setError(`Batch submission failed: ${err.message}`)
       setBusy(false)
     }
   }
@@ -196,9 +220,26 @@ function App() {
     URL.revokeObjectURL(url)
   }
 
-  return (
-    <div className="container">
-      <h1>FPL Power/Meter Status</h1>
+  // Error boundary for rendering
+  if (error) {
+    return (
+      <div className="container">
+        <h1>FPL Power/Meter Status</h1>
+        <div style={{ background: '#f8d7da', color: '#721c24', padding: '20px', borderRadius: '4px', margin: '20px 0' }}>
+          <h3>Application Error</h3>
+          <p>{error}</p>
+          <button onClick={() => { setError(null); window.location.reload(); }} style={{ marginTop: '10px', padding: '8px 16px' }}>
+            Reload Page
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  try {
+    return (
+      <div className="container">
+        <h1>FPL Power/Meter Status</h1>
 
       <section>
         <h2>Credentials</h2>
@@ -331,7 +372,22 @@ function App() {
         )}
       </section>
     </div>
-  )
+    )
+  } catch (renderError) {
+    console.error('Rendering error:', renderError)
+    return (
+      <div className="container">
+        <h1>FPL Power/Meter Status</h1>
+        <div style={{ background: '#f8d7da', color: '#721c24', padding: '20px', borderRadius: '4px', margin: '20px 0' }}>
+          <h3>Rendering Error</h3>
+          <p>An error occurred while rendering the page: {renderError.message}</p>
+          <button onClick={() => window.location.reload()} style={{ marginTop: '10px', padding: '8px 16px' }}>
+            Reload Page
+          </button>
+        </div>
+      </div>
+    )
+  }
 }
 
 export default App
