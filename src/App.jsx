@@ -75,6 +75,7 @@ function App() {
     e.preventDefault()
     setBusy(true)
     setBatchResults([])
+    setJobId('')
     try {
       // Save credentials for future use
       saveCredentials(form.username, form.tin)
@@ -86,28 +87,75 @@ function App() {
       fd.append('file', file)
       const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/batch`, { method: 'POST', body: fd })
       const data = await res.json()
+      console.log('Batch response:', data) // Debug log
+      
       if (data?.jobId) {
         setJobId(data.jobId)
         // poll results every 2s until completed
         pollResults(data.jobId)
+      } else {
+        console.error('No jobId in response:', data)
+        setBusy(false)
       }
     } catch (err) {
-      console.error(err)
-    } finally {
+      console.error('Batch submission error:', err)
       setBusy(false)
     }
   }
 
   async function pollResults(job) {
     let done = false
-    while (!done) {
+    let pollCount = 0
+    const maxPolls = 60 // Stop after 2 minutes (60 * 2s)
+    
+    while (!done && pollCount < maxPolls) {
       await new Promise(r => setTimeout(r, 2000))
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/jobs/${job}/results`)
-      if (!res.ok) break
-      const data = await res.json()
-      setBatchResults(data.results || [])
-      done = data?.job?.status !== 'running'
+      pollCount++
+      
+      try {
+        const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/jobs/${job}/results`)
+        if (!res.ok) {
+          console.error('Failed to fetch results:', res.status)
+          break
+        }
+        
+        const data = await res.json()
+        console.log('Polling results:', data) // Debug log
+        
+        // Update results
+        setBatchResults(data || [])
+        
+        // Check if job is complete by looking at job status
+        const jobRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/jobs`)
+        if (jobRes.ok) {
+          const jobs = await jobRes.json()
+          const currentJob = jobs.find(j => j.job_id === job)
+          if (currentJob) {
+            console.log('Job status:', currentJob.status) // Debug log
+            done = currentJob.status !== 'running'
+          }
+        }
+        
+        // Also stop if we have results and haven't seen new ones in a while
+        if (data && data.length > 0) {
+          const hasErrors = data.some(r => r.error)
+          if (!hasErrors) {
+            // If no errors, assume we're done
+            done = true
+          }
+        }
+        
+      } catch (error) {
+        console.error('Polling error:', error)
+        break
+      }
     }
+    
+    if (pollCount >= maxPolls) {
+      console.log('Polling timeout reached')
+    }
+    
+    setBusy(false)
   }
 
   function downloadCsv() {
