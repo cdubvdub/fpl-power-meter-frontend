@@ -11,6 +11,17 @@ function App() {
   const [batchResults, setBatchResults] = useState([])
   const [error, setError] = useState(null)
 
+  // Safe setter for batch results to prevent objects from being set
+  const setBatchResultsSafe = (newResults) => {
+    console.log('Setting batch results:', newResults)
+    if (Array.isArray(newResults)) {
+      setBatchResults(newResults)
+    } else {
+      console.error('Attempted to set non-array batch results:', newResults)
+      setBatchResults([])
+    }
+  }
+
   // Clear any errors when starting new operations
   const clearError = () => setError(null)
 
@@ -82,7 +93,7 @@ function App() {
     try {
       console.log('Setting busy state')
       setBusy(true)
-      setBatchResults([])
+      setBatchResultsSafe([])
       setJobId('')
       
       console.log('Form data:', { username: form.username, tin: form.tin, file: file?.name })
@@ -154,13 +165,13 @@ function App() {
         // Safely update results - handle both array and object responses
         if (Array.isArray(data)) {
           console.log('Setting batchResults to array:', data)
-          setBatchResults(data)
+          setBatchResultsSafe(data)
         } else if (data && typeof data === 'object' && Array.isArray(data.results)) {
           console.log('Setting batchResults to data.results:', data.results)
-          setBatchResults(data.results)
+          setBatchResultsSafe(data.results)
         } else {
           console.warn('Unexpected data format:', data)
-          setBatchResults([])
+          setBatchResultsSafe([])
         }
         
         // Check if job is complete by looking at job status
