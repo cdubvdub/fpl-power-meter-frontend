@@ -22,6 +22,17 @@ function App() {
     }
   }
 
+  // Safe setter for jobId to prevent objects from being set
+  const setJobIdSafe = (newJobId) => {
+    console.log('Setting jobId:', newJobId)
+    if (typeof newJobId === 'string' || typeof newJobId === 'number') {
+      setJobId(String(newJobId))
+    } else {
+      console.error('Attempted to set non-string jobId:', newJobId)
+      setJobId('')
+    }
+  }
+
   // Clear any errors when starting new operations
   const clearError = () => setError(null)
 
@@ -94,7 +105,7 @@ function App() {
       console.log('Setting busy state')
       setBusy(true)
       setBatchResultsSafe([])
-      setJobId('')
+      setJobIdSafe('')
       
       console.log('Form data:', { username: form.username, tin: form.tin, file: file?.name })
       
@@ -123,7 +134,7 @@ function App() {
       
       if (data && typeof data === 'object' && data.jobId) {
         console.log('Job ID received:', data.jobId)
-        setJobId(data.jobId)
+        setJobIdSafe(data.jobId)
         // poll results every 2s until completed
         console.log('Starting polling')
         pollResults(data.jobId)
@@ -336,7 +347,7 @@ function App() {
         {jobId && (
           <div className="table-wrapper">
             <div className="toolbar">
-              <span>Job: {jobId}</span>
+              <span>Job: {String(jobId)}</span>
               <button onClick={downloadCsv}>Download CSV</button>
             </div>
             {busy && (
