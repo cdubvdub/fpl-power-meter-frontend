@@ -51,7 +51,7 @@ function App() {
       // Save credentials for future use
       saveCredentials(form.username, form.tin)
       
-      const res = await fetch('/api/lookup', {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/lookup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -84,7 +84,7 @@ function App() {
       fd.append('password', form.password)
       fd.append('tin', form.tin)
       fd.append('file', file)
-      const res = await fetch('/api/batch', { method: 'POST', body: fd })
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/batch`, { method: 'POST', body: fd })
       const data = await res.json()
       if (data?.jobId) {
         setJobId(data.jobId)
@@ -102,7 +102,7 @@ function App() {
     let done = false
     while (!done) {
       await new Promise(r => setTimeout(r, 2000))
-      const res = await fetch(`/api/batch/${job}`)
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/jobs/${job}/results`)
       if (!res.ok) break
       const data = await res.json()
       setBatchResults(data.results || [])
