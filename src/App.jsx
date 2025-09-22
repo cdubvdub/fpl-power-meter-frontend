@@ -153,8 +153,10 @@ function App() {
         
         // Safely update results - handle both array and object responses
         if (Array.isArray(data)) {
+          console.log('Setting batchResults to array:', data)
           setBatchResults(data)
         } else if (data && typeof data === 'object' && Array.isArray(data.results)) {
+          console.log('Setting batchResults to data.results:', data.results)
           setBatchResults(data.results)
         } else {
           console.warn('Unexpected data format:', data)
@@ -347,17 +349,30 @@ function App() {
                 </tr>
               </thead>
               <tbody>
-                {(batchResults || []).map((r, idx) => {
+                {(() => {
+                  console.log('Rendering batchResults:', batchResults)
+                  return (batchResults || []).map((r, idx) => {
                   try {
+                    // Ensure r is an object and not something else
+                    if (!r || typeof r !== 'object') {
+                      console.warn('Invalid row data:', r)
+                      return (
+                        <tr key={idx}>
+                          <td data-label="#">{idx+1}</td>
+                          <td data-label="Address" colSpan="6" className="error">Invalid data</td>
+                        </tr>
+                      )
+                    }
+                    
                     return (
                       <tr key={idx}>
                         <td data-label="#">{idx+1}</td>
-                        <td data-label="Address">{r?.address || '-'}</td>
-                        <td data-label="Unit">{r?.unit || '-'}</td>
-                        <td data-label="Meter Status">{r?.meter_status || '-'}</td>
-                        <td data-label="Property Status">{r?.property_status || '-'}</td>
+                        <td data-label="Address">{String(r?.address || '-')}</td>
+                        <td data-label="Unit">{String(r?.unit || '-')}</td>
+                        <td data-label="Meter Status">{String(r?.meter_status || '-')}</td>
+                        <td data-label="Property Status">{String(r?.property_status || '-')}</td>
                         <td data-label="Status Captured">{r?.status_captured_at ? new Date(r.status_captured_at).toLocaleString() : '-'}</td>
-                        <td data-label="Error" className="error">{r?.error || '-'}</td>
+                        <td data-label="Error" className="error">{String(r?.error || '-')}</td>
                       </tr>
                     )
                   } catch (error) {
@@ -369,7 +384,8 @@ function App() {
                       </tr>
                     )
                   }
-                })}
+                })
+                })()}
               </tbody>
             </table>
           </div>
