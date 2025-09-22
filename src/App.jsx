@@ -110,7 +110,7 @@ function App() {
       const data = await res.json()
       console.log('Batch response:', data) // Debug log
       
-      if (data?.jobId) {
+      if (data && typeof data === 'object' && data.jobId) {
         console.log('Job ID received:', data.jobId)
         setJobId(data.jobId)
         // poll results every 2s until completed
@@ -118,6 +118,7 @@ function App() {
         pollResults(data.jobId)
       } else {
         console.error('No jobId in response:', data)
+        setError(`Invalid response from server: ${JSON.stringify(data)}`)
         setBusy(false)
       }
     } catch (err) {
@@ -150,9 +151,11 @@ function App() {
         const data = await res.json()
         console.log('Polling results:', data) // Debug log
         
-        // Safely update results
+        // Safely update results - handle both array and object responses
         if (Array.isArray(data)) {
           setBatchResults(data)
+        } else if (data && typeof data === 'object' && Array.isArray(data.results)) {
+          setBatchResults(data.results)
         } else {
           console.warn('Unexpected data format:', data)
           setBatchResults([])
@@ -178,8 +181,9 @@ function App() {
         }
         
         // Also stop if we have results and no errors
-        if (Array.isArray(data) && data.length > 0) {
-          const hasErrors = data.some(r => r && r.error)
+        const resultsArray = Array.isArray(data) ? data : (data && Array.isArray(data.results) ? data.results : [])
+        if (resultsArray.length > 0) {
+          const hasErrors = resultsArray.some(r => r && r.error)
           if (!hasErrors) {
             console.log('No errors found, assuming job complete')
             done = true
