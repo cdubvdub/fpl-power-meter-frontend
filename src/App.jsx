@@ -108,46 +108,64 @@ function App() {
     let pollCount = 0
     const maxPolls = 60 // Stop after 2 minutes (60 * 2s)
     
+    console.log('Starting to poll for job:', job)
+    
     while (!done && pollCount < maxPolls) {
       await new Promise(r => setTimeout(r, 2000))
       pollCount++
       
       try {
+        console.log(`Polling attempt ${pollCount}/${maxPolls} for job:`, job)
+        
         const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/jobs/${job}/results`)
         if (!res.ok) {
-          console.error('Failed to fetch results:', res.status)
+          console.error('Failed to fetch results:', res.status, res.statusText)
           break
         }
         
         const data = await res.json()
         console.log('Polling results:', data) // Debug log
         
-        // Update results
-        setBatchResults(data || [])
-        
-        // Check if job is complete by looking at job status
-        const jobRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/jobs`)
-        if (jobRes.ok) {
-          const jobs = await jobRes.json()
-          const currentJob = jobs.find(j => j.job_id === job)
-          if (currentJob) {
-            console.log('Job status:', currentJob.status) // Debug log
-            done = currentJob.status !== 'running'
-          }
+        // Safely update results
+        if (Array.isArray(data)) {
+          setBatchResults(data)
+        } else {
+          console.warn('Unexpected data format:', data)
+          setBatchResults([])
         }
         
-        // Also stop if we have results and haven't seen new ones in a while
-        if (data && data.length > 0) {
-          const hasErrors = data.some(r => r.error)
+        // Check if job is complete by looking at job status
+        try {
+          const jobRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/jobs`)
+          if (jobRes.ok) {
+            const jobs = await jobRes.json()
+            const currentJob = jobs.find(j => j.job_id === job)
+            if (currentJob) {
+              console.log('Job status:', currentJob.status) // Debug log
+              done = currentJob.status !== 'running'
+            } else {
+              console.log('Job not found in jobs list, assuming complete')
+              done = true
+            }
+          }
+        } catch (jobError) {
+          console.warn('Failed to check job status:', jobError)
+          // Continue polling even if job status check fails
+        }
+        
+        // Also stop if we have results and no errors
+        if (Array.isArray(data) && data.length > 0) {
+          const hasErrors = data.some(r => r && r.error)
           if (!hasErrors) {
-            // If no errors, assume we're done
+            console.log('No errors found, assuming job complete')
             done = true
           }
         }
         
       } catch (error) {
         console.error('Polling error:', error)
-        break
+        // Don't break on error, continue polling
+        console.log('Continuing to poll despite error...')
       }
     }
     
@@ -155,6 +173,7 @@ function App() {
       console.log('Polling timeout reached')
     }
     
+    console.log('Polling completed for job:', job)
     setBusy(false)
   }
 
@@ -262,6 +281,14 @@ function App() {
               <span>Job: {jobId}</span>
               <button onClick={downloadCsv}>Download CSV</button>
             </div>
+            {busy && (
+              <div style={{ padding: '20px', textAlign: 'center', background: '#f8f9fa', borderRadius: '4px', margin: '10px 0' }}>
+                <div>Processing batch job... Please wait.</div>
+                <div style={{ fontSize: '0.9em', color: '#666', marginTop: '5px' }}>
+                  Check browser console (F12) for progress updates.
+                </div>
+              </div>
+            )}
             <table>
               <thead>
                 <tr>
@@ -275,17 +302,29 @@ function App() {
                 </tr>
               </thead>
               <tbody>
-                {(batchResults || []).map((r, idx) => (
-                  <tr key={idx}>
-                    <td data-label="#">{idx+1}</td>
-                    <td data-label="Address">{r.address}</td>
-                    <td data-label="Unit">{r.unit}</td>
-                    <td data-label="Meter Status">{r.meter_status}</td>
-                    <td data-label="Property Status">{r.property_status}</td>
-                    <td data-label="Status Captured">{r.status_captured_at ? new Date(r.status_captured_at).toLocaleString() : '-'}</td>
-                    <td data-label="Error" className="error">{r.error}</td>
-                  </tr>
-                ))}
+                {(batchResults || []).map((r, idx) => {
+                  try {
+                    return (
+                      <tr key={idx}>
+                        <td data-label="#">{idx+1}</td>
+                        <td data-label="Address">{r?.address || '-'}</td>
+                        <td data-label="Unit">{r?.unit || '-'}</td>
+                        <td data-label="Meter Status">{r?.meter_status || '-'}</td>
+                        <td data-label="Property Status">{r?.property_status || '-'}</td>
+                        <td data-label="Status Captured">{r?.status_captured_at ? new Date(r.status_captured_at).toLocaleString() : '-'}</td>
+                        <td data-label="Error" className="error">{r?.error || '-'}</td>
+                      </tr>
+                    )
+                  } catch (error) {
+                    console.error('Error rendering row:', error, r)
+                    return (
+                      <tr key={idx}>
+                        <td data-label="#">{idx+1}</td>
+                        <td data-label="Address" colSpan="6" className="error">Error rendering row</td>
+                      </tr>
+                    )
+                  }
+                })}
               </tbody>
             </table>
           </div>
