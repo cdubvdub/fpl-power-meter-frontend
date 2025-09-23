@@ -168,7 +168,7 @@ function App() {
   async function pollResults(job) {
     let done = false
     let pollCount = 0
-    const maxPolls = 60 // Stop after 2 minutes (60 * 2s)
+    const maxPolls = 300 // Stop after 10 minutes (300 * 2s) for long lists
     
     console.log('Starting to poll for job:', job)
     
@@ -235,6 +235,11 @@ function App() {
         // If we've been polling for a while and still no results, check if we should continue
         if (pollCount > 10 && resultsArray.length === 0) {
           console.log('Been polling for a while with no results, continuing...')
+        }
+        
+        // Show progress every 10 polls
+        if (pollCount % 10 === 0) {
+          console.log(`Polling progress: ${pollCount}/${maxPolls} attempts, ${resultsArray.length} results so far`)
         }
         
       } catch (error) {
@@ -377,7 +382,10 @@ function App() {
               <div style={{ padding: '20px', textAlign: 'center', background: '#f8f9fa', borderRadius: '4px', margin: '10px 0' }}>
                 <div>Processing batch job... Please wait.</div>
                 <div style={{ fontSize: '0.9em', color: '#666', marginTop: '5px' }}>
-                  Check browser console (F12) for progress updates.
+                  Results: {batchResults.length} processed so far
+                </div>
+                <div style={{ fontSize: '0.8em', color: '#888', marginTop: '3px' }}>
+                  Check browser console (F12) for detailed progress updates.
                 </div>
               </div>
             )}
