@@ -210,39 +210,34 @@ function App() {
                           setBatchResultsSafe([])
                         }
         
-        // Check if job is complete by looking at job status
-        try {
-          const jobRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/jobs`)
-          if (jobRes.ok) {
-            const jobs = await jobRes.json()
-            console.log('All jobs:', jobs) // Debug log
-            const currentJob = jobs.find(j => j.job_id === job)
-            if (currentJob) {
-              console.log('Found job:', currentJob) // Debug log
-              console.log('Job status:', currentJob.status) // Debug log
-              done = currentJob.status !== 'running'
-            } else {
-              console.log('Job not found in jobs list, continuing to poll...')
-              // Don't assume complete, continue polling
-              done = false
-            }
-          }
-        } catch (jobError) {
-          console.warn('Failed to check job status:', jobError)
-          // Continue polling even if job status check fails
-        }
-        
-        // Also stop if we have results and no errors
-        const resultsArray = Array.isArray(data) ? data : (data && Array.isArray(data.results) ? data.results : [])
-        if (resultsArray.length > 0) {
-          const hasErrors = resultsArray.some(r => r && r.error)
-          if (!hasErrors) {
-            console.log('No errors found, assuming job complete')
-            done = true
-          }
-        }
+                        // Check if job is complete by looking at job status
+                        try {
+                          const jobRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/jobs`)
+                          if (jobRes.ok) {
+                            const jobs = await jobRes.json()
+                            console.log('All jobs:', jobs) // Debug log
+                            const currentJob = jobs.find(j => j.job_id === job)
+                            if (currentJob) {
+                              console.log('Found job:', currentJob) // Debug log
+                              console.log('Job status:', currentJob.status) // Debug log
+                              done = currentJob.status !== 'running'
+                            } else {
+                              console.log('Job not found in jobs list, continuing to poll...')
+                              // Don't assume complete, continue polling
+                              done = false
+                            }
+                          }
+                        } catch (jobError) {
+                          console.warn('Failed to check job status:', jobError)
+                          // Continue polling even if job status check fails
+                        }
+                        
+                        // Don't stop polling just because we have results - continue until job is complete
+                        // The backend will continue processing all addresses even if we have some results
+                        console.log('Continuing to poll for more results...')
         
         // If we've been polling for a while and still no results, check if we should continue
+        const resultsArray = Array.isArray(data) ? data : (data && Array.isArray(data.results) ? data.results : [])
         if (pollCount > 10 && resultsArray.length === 0) {
           console.log('Been polling for a while with no results, continuing...')
         }
