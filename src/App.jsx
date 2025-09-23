@@ -137,7 +137,12 @@ function App() {
       if (typeof data === 'string') {
         jobIdToUse = data
       } else if (data && typeof data === 'object' && data.jobId) {
-        jobIdToUse = data.jobId
+        // Check if jobId is a string or nested object
+        if (typeof data.jobId === 'string') {
+          jobIdToUse = data.jobId
+        } else if (typeof data.jobId === 'object' && data.jobId.jobId) {
+          jobIdToUse = data.jobId.jobId
+        }
       } else if (data && typeof data === 'object' && data.job_id) {
         jobIdToUse = data.job_id
       }
