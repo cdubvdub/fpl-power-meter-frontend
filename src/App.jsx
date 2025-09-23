@@ -267,9 +267,9 @@ function App() {
     const rows = (batchResults || []).map(r => [
       r.address || '', 
       r.unit || '', 
-      r.meter_status || '', 
-      r.property_status || '', 
-      r.status_captured_at ? new Date(r.status_captured_at).toLocaleString() : '',
+      r.meterStatus || '', 
+      r.propertyStatus || '', 
+      r.statusCapturedAt ? new Date(r.statusCapturedAt).toLocaleString() : '',
       r.error || ''
     ].map(v => `"${String(v).replaceAll('"','""')}"`).join(',')).join('\n')
     const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' })
@@ -325,9 +325,9 @@ function App() {
       const rows = results.map(r => [
         r.address || '', 
         r.unit || '', 
-        r.meter_status || '', 
-        r.property_status || '', 
-        r.status_captured_at ? new Date(r.status_captured_at).toLocaleString() : '',
+        r.meterStatus || '', 
+        r.propertyStatus || '', 
+        r.statusCapturedAt ? new Date(r.statusCapturedAt).toLocaleString() : '',
         r.error || ''
       ].map(v => `"${String(v).replaceAll('"','""')}"`).join(',')).join('\n')
       
@@ -497,9 +497,9 @@ function App() {
                         <td data-label="#">{idx+1}</td>
                         <td data-label="Address">{String(r?.address || '-')}</td>
                         <td data-label="Unit">{String(r?.unit || '-')}</td>
-                        <td data-label="Meter Status">{String(r?.meter_status || '-')}</td>
-                        <td data-label="Property Status">{String(r?.property_status || '-')}</td>
-                        <td data-label="Status Captured">{r?.status_captured_at ? new Date(r.status_captured_at).toLocaleString() : '-'}</td>
+                        <td data-label="Meter Status">{String(r?.meterStatus || '-')}</td>
+                        <td data-label="Property Status">{String(r?.propertyStatus || '-')}</td>
+                        <td data-label="Status Captured">{r?.statusCapturedAt ? new Date(r.statusCapturedAt).toLocaleString() : '-'}</td>
                         <td data-label="Error" className="error">{String(r?.error || '-')}</td>
                       </tr>
                     )
