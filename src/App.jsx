@@ -190,20 +190,25 @@ function App() {
           break
         }
         
-        const data = await res.json()
-        console.log('Polling results:', data) // Debug log
+                        const data = await res.json()
+                        console.log('Polling results:', data) // Debug log
+                        console.log('Polling results details:', JSON.stringify(data, null, 2)) // Detailed log
         
-        // Safely update results - handle both array and object responses
-        if (Array.isArray(data)) {
-          console.log('Setting batchResults to array:', data)
-          setBatchResultsSafe(data)
-        } else if (data && typeof data === 'object' && Array.isArray(data.results)) {
-          console.log('Setting batchResults to data.results:', data.results)
-          setBatchResultsSafe(data.results)
-        } else {
-          console.warn('Unexpected data format:', data)
-          setBatchResultsSafe([])
-        }
+                        // Safely update results - handle both array and object responses
+                        if (Array.isArray(data)) {
+                          console.log('Setting batchResults to array:', data)
+                          console.log('Result job IDs:', data.map(r => r.jobId || r.job_id))
+                          console.log('Looking for job ID:', job)
+                          setBatchResultsSafe(data)
+                        } else if (data && typeof data === 'object' && Array.isArray(data.results)) {
+                          console.log('Setting batchResults to data.results:', data.results)
+                          console.log('Result job IDs:', data.results.map(r => r.jobId || r.job_id))
+                          console.log('Looking for job ID:', job)
+                          setBatchResultsSafe(data.results)
+                        } else {
+                          console.warn('Unexpected data format:', data)
+                          setBatchResultsSafe([])
+                        }
         
         // Check if job is complete by looking at job status
         try {
