@@ -173,12 +173,12 @@ function App() {
   async function pollResults(job) {
     let done = false
     let pollCount = 0
-    const maxPolls = 300 // Stop after 10 minutes (300 * 2s) for long lists
+    const maxPolls = 30 // Stop after 10 minutes (30 * 20s) for long lists
     
     console.log('Starting to poll for job:', job)
     
     while (!done && pollCount < maxPolls) {
-      await new Promise(r => setTimeout(r, 2000))
+      await new Promise(r => setTimeout(r, 20000)) // Changed to 20 seconds
       pollCount++
       
       try {
