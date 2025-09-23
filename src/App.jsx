@@ -10,6 +10,11 @@ function App() {
   const [jobId, setJobId] = useState('')
   const [batchResults, setBatchResults] = useState([])
   const [error, setError] = useState(null)
+  
+  // Search functionality
+  const [searchResults, setSearchResults] = useState([])
+  const [searchLoading, setSearchLoading] = useState(false)
+  const [searchForm, setSearchForm] = useState({ startDate: '', endDate: '' })
 
   // Safe setter for batch results to prevent objects from being set
   const setBatchResultsSafe = (newResults) => {
@@ -276,6 +281,76 @@ function App() {
     URL.revokeObjectURL(url)
   }
 
+  async function searchJobs(e) {
+    e.preventDefault()
+    setSearchLoading(true)
+    setSearchResults([])
+    
+    try {
+      const params = new URLSearchParams()
+      if (searchForm.startDate) params.append('startDate', searchForm.startDate)
+      if (searchForm.endDate) params.append('endDate', searchForm.endDate)
+      
+      const url = `${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/jobs/search?${params.toString()}`
+      console.log('Searching jobs:', url)
+      
+      const res = await fetch(url)
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`)
+      }
+      
+      const jobs = await res.json()
+      console.log('Search results:', jobs)
+      setSearchResults(jobs)
+    } catch (err) {
+      console.error('Search error:', err)
+      setError(`Search failed: ${err.message}`)
+    } finally {
+      setSearchLoading(false)
+    }
+  }
+
+  async function loadJobResults(jobId) {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/jobs/${jobId}/results`)
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`)
+      }
+      
+      const results = await res.json()
+      console.log('Job results:', results)
+      
+      // Create CSV content
+      const header = 'address,unit,meter_status,property_status,status_captured_at,error\n'
+      const rows = results.map(r => [
+        r.address || '', 
+        r.unit || '', 
+        r.meter_status || '', 
+        r.property_status || '', 
+        r.status_captured_at ? new Date(r.status_captured_at).toLocaleString() : '',
+        r.error || ''
+      ].map(v => `"${String(v).replaceAll('"','""')}"`).join(',')).join('\n')
+      
+      const csvContent = header + rows
+      
+      // Download CSV
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `job-${jobId}-results.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+      
+      // Also copy to clipboard
+      await navigator.clipboard.writeText(csvContent)
+      alert('Results copied to clipboard and downloaded!')
+    } catch (err) {
+      console.error('Error loading job results:', err)
+      setError(`Failed to load job results: ${err.message}`)
+    }
+  }
+
   // Error boundary for rendering
   if (error) {
     return (
@@ -444,8 +519,78 @@ function App() {
           </div>
         )}
       </section>
+
+      <section>
+        <h2>Search Previous Runs</h2>
+        <form onSubmit={searchJobs}>
+          <div className="grid">
+            <input 
+              type="date" 
+              placeholder="Start Date (optional)" 
+              value={searchForm.startDate} 
+              onChange={(e) => setSearchForm({...searchForm, startDate: e.target.value})}
+            />
+            <input 
+              type="date" 
+              placeholder="End Date (optional)" 
+              value={searchForm.endDate} 
+              onChange={(e) => setSearchForm({...searchForm, endDate: e.target.value})}
+            />
+          </div>
+          <button type="submit" disabled={searchLoading}>
+            {searchLoading ? 'Searching...' : 'Search Jobs'}
+          </button>
+        </form>
+
+        {searchResults.length > 0 && (
+          <div className="table-wrapper">
+            <div className="toolbar">
+              <span>Found {searchResults.length} job(s)</span>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Job ID</th>
+                  <th>Created</th>
+                  <th>Status</th>
+                  <th>Total</th>
+                  <th>Processed</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {searchResults.map((job) => (
+                  <tr key={job.job_id}>
+                    <td data-label="Job ID">{job.job_id}</td>
+                    <td data-label="Created">{new Date(job.created_at).toLocaleString()}</td>
+                    <td data-label="Status">{job.status}</td>
+                    <td data-label="Total">{job.total}</td>
+                    <td data-label="Processed">{job.processed}</td>
+                    <td data-label="Actions">
+                      <button 
+                        onClick={() => loadJobResults(job.job_id)}
+                        style={{ 
+                          background: '#28a745', 
+                          color: 'white', 
+                          border: 'none', 
+                          padding: '4px 8px', 
+                          borderRadius: '3px',
+                          cursor: 'pointer',
+                          fontSize: '0.8em'
+                        }}
+                      >
+                        Download & Copy
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
-    )
+  )
   } catch (renderError) {
     console.error('Rendering error:', renderError)
     return (
