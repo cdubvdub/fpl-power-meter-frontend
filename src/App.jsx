@@ -190,7 +190,7 @@ function App() {
           break
         }
         
-                        const data = await res.json()
+      const data = await res.json()
                         console.log('Polling results:', data) // Debug log
                         console.log('Polling results details:', JSON.stringify(data, null, 2)) // Detailed log
         
@@ -216,7 +216,7 @@ function App() {
                           if (jobRes.ok) {
                             const jobs = await jobRes.json()
                             console.log('All jobs:', jobs) // Debug log
-                            const currentJob = jobs.find(j => j.job_id === job)
+                            const currentJob = jobs.find(j => j.jobId === job)
                             if (currentJob) {
                               console.log('Found job:', currentJob) // Debug log
                               console.log('Job status:', currentJob.status) // Debug log
@@ -368,9 +368,9 @@ function App() {
   }
 
   try {
-    return (
-      <div className="container">
-        <h1>FPL Power/Meter Status</h1>
+  return (
+    <div className="container">
+      <h1>FPL Power/Meter Status</h1>
 
       <section>
         <h2>Credentials</h2>
@@ -506,8 +506,8 @@ function App() {
                   } catch (error) {
                     console.error('Error rendering row:', error, r)
                     return (
-                      <tr key={idx}>
-                        <td data-label="#">{idx+1}</td>
+                  <tr key={idx}>
+                    <td data-label="#">{idx+1}</td>
                         <td data-label="Address" colSpan="6" className="error">Error rendering row</td>
                       </tr>
                     )
@@ -560,15 +560,15 @@ function App() {
               </thead>
               <tbody>
                 {searchResults.map((job) => (
-                  <tr key={job.job_id}>
-                    <td data-label="Job ID">{job.job_id}</td>
-                    <td data-label="Created">{new Date(job.created_at).toLocaleString()}</td>
+                  <tr key={job.jobId}>
+                    <td data-label="Job ID">{job.jobId}</td>
+                    <td data-label="Created">{new Date(job.createdAt).toLocaleString()}</td>
                     <td data-label="Status">{job.status}</td>
                     <td data-label="Total">{job.total}</td>
                     <td data-label="Processed">{job.processed}</td>
                     <td data-label="Actions">
                       <button 
-                        onClick={() => loadJobResults(job.job_id)}
+                        onClick={() => loadJobResults(job.jobId)}
                         style={{ 
                           background: '#28a745', 
                           color: 'white', 
