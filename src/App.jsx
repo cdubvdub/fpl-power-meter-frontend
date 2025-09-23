@@ -132,15 +132,25 @@ function App() {
       const data = await res.json()
       console.log('Batch response:', data) // Debug log
       
-      if (data && typeof data === 'object' && data.jobId) {
-        console.log('Job ID received:', data.jobId)
-        setJobIdSafe(data.jobId)
+      // Handle both direct jobId string and job object responses
+      let jobIdToUse = null
+      if (typeof data === 'string') {
+        jobIdToUse = data
+      } else if (data && typeof data === 'object' && data.jobId) {
+        jobIdToUse = data.jobId
+      } else if (data && typeof data === 'object' && data.job_id) {
+        jobIdToUse = data.job_id
+      }
+      
+      if (jobIdToUse) {
+        console.log('Job ID received:', jobIdToUse)
+        setJobIdSafe(jobIdToUse)
         // poll results every 2s until completed
         console.log('Starting polling')
-        pollResults(data.jobId)
+        pollResults(jobIdToUse)
       } else {
-        console.error('No jobId in response:', data)
-        setError(`Invalid response from server: ${JSON.stringify(data)}`)
+        console.error('No jobId found in response:', data)
+        setError(`No jobId found in response: ${JSON.stringify(data)}`)
         setBusy(false)
       }
     } catch (err) {
