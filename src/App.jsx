@@ -205,13 +205,16 @@ function App() {
           const jobRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/jobs`)
           if (jobRes.ok) {
             const jobs = await jobRes.json()
+            console.log('All jobs:', jobs) // Debug log
             const currentJob = jobs.find(j => j.job_id === job)
             if (currentJob) {
+              console.log('Found job:', currentJob) // Debug log
               console.log('Job status:', currentJob.status) // Debug log
               done = currentJob.status !== 'running'
             } else {
-              console.log('Job not found in jobs list, assuming complete')
-              done = true
+              console.log('Job not found in jobs list, continuing to poll...')
+              // Don't assume complete, continue polling
+              done = false
             }
           }
         } catch (jobError) {
@@ -227,6 +230,11 @@ function App() {
             console.log('No errors found, assuming job complete')
             done = true
           }
+        }
+        
+        // If we've been polling for a while and still no results, check if we should continue
+        if (pollCount > 10 && resultsArray.length === 0) {
+          console.log('Been polling for a while with no results, continuing...')
         }
         
       } catch (error) {
