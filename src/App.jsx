@@ -15,6 +15,8 @@ function App() {
   const [searchResults, setSearchResults] = useState([])
   const [searchLoading, setSearchLoading] = useState(false)
   const [searchForm, setSearchForm] = useState({ startDate: '', endDate: '' })
+  const [downloadingJobId, setDownloadingJobId] = useState(null)
+  const [downloadingBatch, setDownloadingBatch] = useState(false)
 
   // Safe setter for batch results to prevent objects from being set
   const setBatchResultsSafe = (newResults) => {
@@ -263,22 +265,27 @@ function App() {
   }
 
   function downloadCsv() {
-    const header = 'address,unit,meter_status,property_status,status_captured_at,error\n'
-    const rows = (batchResults || []).map(r => [
-      r.address || '', 
-      r.unit || '', 
-      r.meterStatus || '', 
-      r.propertyStatus || '', 
-      r.statusCapturedAt ? new Date(r.statusCapturedAt).toLocaleString() : '',
-      r.error || ''
-    ].map(v => `"${String(v).replaceAll('"','""')}"`).join(',')).join('\n')
-    const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `results-${jobId || 'batch'}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+    setDownloadingBatch(true)
+    try {
+      const header = 'address,unit,meter_status,property_status,status_captured_at,error\n'
+      const rows = (batchResults || []).map(r => [
+        r.address || '', 
+        r.unit || '', 
+        r.meterStatus || '', 
+        r.propertyStatus || '', 
+        r.statusCapturedAt ? new Date(r.statusCapturedAt).toLocaleString() : '',
+        r.error || ''
+      ].map(v => `"${String(v).replaceAll('"','""')}"`).join(',')).join('\n')
+      const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `results-${jobId || 'batch'}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+    } finally {
+      setDownloadingBatch(false)
+    }
   }
 
   async function searchJobs(e) {
@@ -311,6 +318,7 @@ function App() {
   }
 
   async function loadJobResults(jobId) {
+    setDownloadingJobId(jobId)
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/jobs/${jobId}/results`)
       if (!res.ok) {
@@ -348,6 +356,8 @@ function App() {
     } catch (err) {
       console.error('Error loading job results:', err)
       setError(`Failed to load job results: ${err.message}`)
+    } finally {
+      setDownloadingJobId(null)
     }
   }
 
@@ -423,7 +433,25 @@ function App() {
             <input placeholder="Address" value={form.address} onChange={(e)=>setForm({...form, address:e.target.value})} />
             <input placeholder="Apt/Unit # (optional)" value={form.unit} onChange={(e)=>setForm({...form, unit:e.target.value})} />
           </div>
-          <button type="submit" disabled={!canSubmitSingle || busy}>Check Status</button>
+                          <button type="submit" disabled={!canSubmitSingle || busy}>
+                            {busy && !jobId ? (
+                              <>
+                                <span style={{ 
+                                  display: 'inline-block', 
+                                  width: '16px', 
+                                  height: '16px', 
+                                  border: '2px solid #ffffff', 
+                                  borderTop: '2px solid transparent', 
+                                  borderRadius: '50%', 
+                                  animation: 'spin 1s linear infinite',
+                                  marginRight: '8px'
+                                }}></span>
+                                Checking Status...
+                              </>
+                            ) : (
+                              'Check Status'
+                            )}
+                          </button>
         </form>
         {singleResult && (
           <div className="result">
@@ -444,14 +472,59 @@ function App() {
         <h2>Batch (CSV Upload)</h2>
         <form onSubmit={submitBatch}>
           <input type="file" accept=".csv" onChange={(e)=>setFile(e.target.files?.[0] || null)} />
-          <button type="submit" disabled={!canSubmitBatch || busy}>Start Batch</button>
+                          <button type="submit" disabled={!canSubmitBatch || busy}>
+                            {busy && jobId ? (
+                              <>
+                                <span style={{ 
+                                  display: 'inline-block', 
+                                  width: '16px', 
+                                  height: '16px', 
+                                  border: '2px solid #ffffff', 
+                                  borderTop: '2px solid transparent', 
+                                  borderRadius: '50%', 
+                                  animation: 'spin 1s linear infinite',
+                                  marginRight: '8px'
+                                }}></span>
+                                Processing Batch...
+                              </>
+                            ) : (
+                              'Start Batch'
+                            )}
+                          </button>
         </form>
 
         {jobId && (
           <div className="table-wrapper">
             <div className="toolbar">
               <span>Job: {String(jobId)}</span>
-              <button onClick={downloadCsv}>Download CSV</button>
+              <button 
+                onClick={downloadCsv}
+                disabled={downloadingBatch}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  opacity: downloadingBatch ? 0.7 : 1,
+                  cursor: downloadingBatch ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {downloadingBatch ? (
+                  <>
+                    <span style={{ 
+                      display: 'inline-block', 
+                      width: '16px', 
+                      height: '16px', 
+                      border: '2px solid #ffffff', 
+                      borderTop: '2px solid transparent', 
+                      borderRadius: '50%', 
+                      animation: 'spin 1s linear infinite'
+                    }}></span>
+                    Downloading...
+                  </>
+                ) : (
+                  'Download CSV'
+                )}
+              </button>
             </div>
             {busy && (
               <div style={{ padding: '20px', textAlign: 'center', background: '#f8f9fa', borderRadius: '4px', margin: '10px 0' }}>
@@ -538,7 +611,23 @@ function App() {
             />
           </div>
           <button type="submit" disabled={searchLoading}>
-            {searchLoading ? 'Searching...' : 'Search Jobs'}
+            {searchLoading ? (
+              <>
+                <span style={{ 
+                  display: 'inline-block', 
+                  width: '16px', 
+                  height: '16px', 
+                  border: '2px solid #ffffff', 
+                  borderTop: '2px solid transparent', 
+                  borderRadius: '50%', 
+                  animation: 'spin 1s linear infinite',
+                  marginRight: '8px'
+                }}></span>
+                Searching...
+              </>
+            ) : (
+              'Search Jobs'
+            )}
           </button>
         </form>
 
@@ -569,17 +658,36 @@ function App() {
                     <td data-label="Actions">
                       <button 
                         onClick={() => loadJobResults(job.jobId)}
+                        disabled={downloadingJobId === job.jobId}
                         style={{ 
-                          background: '#28a745', 
+                          background: downloadingJobId === job.jobId ? '#6c757d' : '#28a745', 
                           color: 'white', 
                           border: 'none', 
                           padding: '4px 8px', 
                           borderRadius: '3px',
-                          cursor: 'pointer',
-                          fontSize: '0.8em'
+                          cursor: downloadingJobId === job.jobId ? 'not-allowed' : 'pointer',
+                          fontSize: '0.8em',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
                         }}
                       >
-                        Download & Copy
+                        {downloadingJobId === job.jobId ? (
+                          <>
+                            <span style={{ 
+                              display: 'inline-block', 
+                              width: '12px', 
+                              height: '12px', 
+                              border: '2px solid #ffffff', 
+                              borderTop: '2px solid transparent', 
+                              borderRadius: '50%', 
+                              animation: 'spin 1s linear infinite'
+                            }}></span>
+                            Downloading...
+                          </>
+                        ) : (
+                          'Download & Copy'
+                        )}
                       </button>
                     </td>
                   </tr>
