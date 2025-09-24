@@ -17,6 +17,8 @@ function App() {
   const [searchForm, setSearchForm] = useState({ startDate: '', endDate: '' })
   const [downloadingJobId, setDownloadingJobId] = useState(null)
   const [downloadingBatch, setDownloadingBatch] = useState(false)
+  const [sseConnection, setSseConnection] = useState(null)
+  const [progressMessage, setProgressMessage] = useState('')
 
   // Safe setter for batch results to prevent objects from being set
   const setBatchResultsSafe = (newResults) => {
@@ -55,6 +57,16 @@ function App() {
       }))
     }
   }, [])
+
+  // Cleanup SSE connection on component unmount
+  useEffect(() => {
+    return () => {
+      if (sseConnection) {
+        console.log('Cleaning up SSE connection on unmount')
+        sseConnection.close()
+      }
+    }
+  }, [sseConnection])
 
   // Save credentials to localStorage
   const saveCredentials = (username, tin) => {
@@ -154,17 +166,17 @@ function App() {
         jobIdToUse = data.job_id
       }
       
-      if (jobIdToUse) {
-        console.log('Job ID received:', jobIdToUse)
-        setJobIdSafe(jobIdToUse)
-        // poll results every 2s until completed
-        console.log('Starting polling')
-        pollResults(jobIdToUse)
-      } else {
-        console.error('No jobId found in response:', data)
-        setError(`No jobId found in response: ${JSON.stringify(data)}`)
-        setBusy(false)
-      }
+                      if (jobIdToUse) {
+                        console.log('Job ID received:', jobIdToUse)
+                        setJobIdSafe(jobIdToUse)
+                        // Connect to Server-Sent Events for real-time updates
+                        console.log('Starting SSE connection')
+                        connectToProgressUpdates(jobIdToUse)
+                      } else {
+                        console.error('No jobId found in response:', data)
+                        setError(`No jobId found in response: ${JSON.stringify(data)}`)
+                        setBusy(false)
+                      }
     } catch (err) {
       console.error('Batch submission error:', err)
       setError(`Batch submission failed: ${err.message}`)
@@ -172,12 +184,113 @@ function App() {
     }
   }
 
+  // Server-Sent Events connection for real-time updates
+  function connectToProgressUpdates(jobId) {
+    console.log('Connecting to Server-Sent Events for job:', jobId)
+    
+    // Close any existing connection
+    if (sseConnection) {
+      sseConnection.close()
+    }
+    
+    const eventSource = new EventSource(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/jobs/${jobId}/progress`)
+    setSseConnection(eventSource)
+    
+    eventSource.onopen = () => {
+      console.log('SSE connection opened for job:', jobId)
+    }
+    
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        console.log('Received SSE update:', data)
+        
+        switch (data.type) {
+          case 'connected':
+            console.log('Connected to progress updates for job:', data.jobId)
+            break
+            
+          case 'job_started':
+            console.log('Job started:', data.message)
+            setProgressMessage(data.message)
+            break
+            
+          case 'address_completed':
+            console.log('Address completed:', data.message)
+            setProgressMessage(data.message)
+            // Refresh results to show the new completed address
+            refreshResults(jobId)
+            break
+            
+          case 'address_failed':
+          case 'address_error':
+            console.log('Address failed/error:', data.message)
+            setProgressMessage(data.message)
+            // Refresh results to show the failed address
+            refreshResults(jobId)
+            break
+            
+          case 'job_completed':
+            console.log('Job completed:', data.message)
+            setProgressMessage(data.message)
+            // Final refresh and stop busy state
+            refreshResults(jobId)
+            setBusy(false)
+            eventSource.close()
+            setSseConnection(null)
+            break
+            
+          case 'job_failed':
+            console.log('Job failed:', data.message)
+            setProgressMessage(data.message)
+            setError(`Batch processing failed: ${data.error}`)
+            setBusy(false)
+            eventSource.close()
+            setSseConnection(null)
+            break
+            
+          default:
+            console.log('Unknown SSE message type:', data.type)
+        }
+      } catch (error) {
+        console.error('Error parsing SSE message:', error)
+      }
+    }
+    
+    eventSource.onerror = (error) => {
+      console.error('SSE connection error:', error)
+      // Fallback to polling if SSE fails
+      console.log('Falling back to polling...')
+      eventSource.close()
+      setSseConnection(null)
+      pollResults(jobId)
+    }
+    
+    // Store the event source for cleanup
+    return eventSource
+  }
+  
+  // Refresh results from the database
+  async function refreshResults(jobId) {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/jobs/${jobId}/results`)
+      if (res.ok) {
+        const data = await res.json()
+        console.log('Refreshed results:', data)
+        setBatchResultsSafe(data)
+      }
+    } catch (error) {
+      console.error('Error refreshing results:', error)
+    }
+  }
+  
+  // Fallback polling function (kept as backup)
   async function pollResults(job) {
     let done = false
     let pollCount = 0
     const maxPolls = 30 // Stop after 10 minutes (30 * 20s) for long lists
     
-    console.log('Starting to poll for job:', job)
+    console.log('Starting fallback polling for job:', job)
     
     while (!done && pollCount < maxPolls) {
       await new Promise(r => setTimeout(r, 20000)) // Changed to 20 seconds
@@ -192,75 +305,30 @@ function App() {
           break
         }
         
-      const data = await res.json()
-                        console.log('Polling results:', data) // Debug log
-                        console.log('Polling results details:', JSON.stringify(data, null, 2)) // Detailed log
+        const data = await res.json()
+        console.log('Polling results:', data) // Debug log
+        setBatchResultsSafe(data)
         
-                        // Safely update results - handle both array and object responses
-                        if (Array.isArray(data)) {
-                          console.log('Setting batchResults to array:', data)
-                          console.log('Result job IDs:', data.map(r => r.jobId || r.job_id))
-                          console.log('Looking for job ID:', job)
-                          setBatchResultsSafe(data)
-                        } else if (data && typeof data === 'object' && Array.isArray(data.results)) {
-                          console.log('Setting batchResults to data.results:', data.results)
-                          console.log('Result job IDs:', data.results.map(r => r.jobId || r.job_id))
-                          console.log('Looking for job ID:', job)
-                          setBatchResultsSafe(data.results)
-                        } else {
-                          console.warn('Unexpected data format:', data)
-                          setBatchResultsSafe([])
-                        }
-        
-                        // Check if job is complete by looking at job status
-                        try {
-                          const jobRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/jobs`)
-                          if (jobRes.ok) {
-                            const jobs = await jobRes.json()
-                            console.log('All jobs:', jobs) // Debug log
-                            const currentJob = jobs.find(j => j.jobId === job)
-                            if (currentJob) {
-                              console.log('Found job:', currentJob) // Debug log
-                              console.log('Job status:', currentJob.status) // Debug log
-                              done = currentJob.status !== 'running'
-                            } else {
-                              console.log('Job not found in jobs list, continuing to poll...')
-                              // Don't assume complete, continue polling
-                              done = false
-                            }
-                          }
-                        } catch (jobError) {
-                          console.warn('Failed to check job status:', jobError)
-                          // Continue polling even if job status check fails
-                        }
-                        
-                        // Don't stop polling just because we have results - continue until job is complete
-                        // The backend will continue processing all addresses even if we have some results
-                        console.log('Continuing to poll for more results...')
-        
-        // If we've been polling for a while and still no results, check if we should continue
-        const resultsArray = Array.isArray(data) ? data : (data && Array.isArray(data.results) ? data.results : [])
-        if (pollCount > 10 && resultsArray.length === 0) {
-          console.log('Been polling for a while with no results, continuing...')
-        }
-        
-        // Show progress every 10 polls
-        if (pollCount % 10 === 0) {
-          console.log(`Polling progress: ${pollCount}/${maxPolls} attempts, ${resultsArray.length} results so far`)
+        // Check if job is complete by looking at job status
+        try {
+          const jobRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/jobs`)
+          if (jobRes.ok) {
+            const jobs = await jobRes.json()
+            const currentJob = jobs.find(j => j.jobId === job)
+            if (currentJob) {
+              done = currentJob.status !== 'running'
+            }
+          }
+        } catch (jobError) {
+          console.warn('Failed to check job status:', jobError)
         }
         
       } catch (error) {
         console.error('Polling error:', error)
-        // Don't break on error, continue polling
-        console.log('Continuing to poll despite error...')
       }
     }
     
-    if (pollCount >= maxPolls) {
-      console.log('Polling timeout reached')
-    }
-    
-    console.log('Polling completed for job:', job)
+    console.log('Fallback polling completed for job:', job)
     setBusy(false)
   }
 
@@ -528,12 +596,29 @@ function App() {
             </div>
             {busy && (
               <div style={{ padding: '20px', textAlign: 'center', background: '#f8f9fa', borderRadius: '4px', margin: '10px 0' }}>
-                <div>Processing batch job... Please wait.</div>
+                <div>
+                  <span style={{ 
+                    display: 'inline-block', 
+                    width: '16px', 
+                    height: '16px', 
+                    border: '2px solid #007bff', 
+                    borderTop: '2px solid transparent', 
+                    borderRadius: '50%', 
+                    animation: 'spin 1s linear infinite',
+                    marginRight: '8px'
+                  }}></span>
+                  Processing batch job... Please wait.
+                </div>
                 <div style={{ fontSize: '0.9em', color: '#666', marginTop: '5px' }}>
                   Results: {batchResults.length} processed so far
                 </div>
+                {progressMessage && (
+                  <div style={{ fontSize: '0.9em', color: '#28a745', marginTop: '5px', fontWeight: 'bold' }}>
+                    {progressMessage}
+                  </div>
+                )}
                 <div style={{ fontSize: '0.8em', color: '#888', marginTop: '3px' }}>
-                  Check browser console (F12) for detailed progress updates.
+                  Real-time updates via Server-Sent Events
                 </div>
               </div>
             )}
