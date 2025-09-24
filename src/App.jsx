@@ -230,6 +230,39 @@ function App() {
             refreshResults(jobId)
             break
             
+          case 'chunk_started':
+          case 'batch_started':
+            console.log('Chunk/Batch started:', data.message)
+            setProgressMessage(data.message)
+            break
+            
+          case 'batch_completed':
+            console.log('Batch completed:', data.message)
+            setProgressMessage(data.message)
+            // Refresh results to show the completed batch
+            refreshResults(jobId)
+            break
+            
+          case 'batch_failed':
+            console.log('Batch failed:', data.message)
+            setProgressMessage(data.message)
+            break
+            
+          case 'queue_started':
+            console.log('Queue started:', data.message)
+            setProgressMessage(data.message)
+            break
+            
+          case 'queue_completed':
+            console.log('Queue completed:', data.message)
+            setProgressMessage(data.message)
+            // Final refresh and stop busy state
+            refreshResults(jobId)
+            setBusy(false)
+            eventSource.close()
+            setSseConnection(null)
+            break
+            
           case 'job_completed':
             console.log('Job completed:', data.message)
             setProgressMessage(data.message)
@@ -613,12 +646,21 @@ function App() {
                   Results: {batchResults.length} processed so far
                 </div>
                 {progressMessage && (
-                  <div style={{ fontSize: '0.9em', color: '#28a745', marginTop: '5px', fontWeight: 'bold' }}>
+                  <div style={{ 
+                    fontSize: '0.9em', 
+                    color: progressMessage.includes('failed') || progressMessage.includes('error') ? '#dc3545' : '#28a745', 
+                    marginTop: '5px', 
+                    fontWeight: 'bold',
+                    padding: '8px',
+                    background: progressMessage.includes('failed') || progressMessage.includes('error') ? '#f8d7da' : '#d4edda',
+                    borderRadius: '4px',
+                    border: progressMessage.includes('failed') || progressMessage.includes('error') ? '1px solid #f5c6cb' : '1px solid #c3e6cb'
+                  }}>
                     {progressMessage}
                   </div>
                 )}
                 <div style={{ fontSize: '0.8em', color: '#888', marginTop: '3px' }}>
-                  Real-time updates via Server-Sent Events
+                  Real-time updates via Server-Sent Events • Processing in 50-address chunks
                 </div>
               </div>
             )}
