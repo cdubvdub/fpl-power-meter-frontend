@@ -328,7 +328,7 @@ function App() {
   async function pollResults(job) {
     let done = false
     let pollCount = 0
-    const maxPolls = 30 // Stop after 10 minutes (30 * 20s) for long lists
+    const maxPolls = 50 // Stop after 16+ minutes (50 * 20s) for long lists
     
     console.log('Starting fallback polling for job:', job)
     
