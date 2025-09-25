@@ -23,7 +23,11 @@ function App() {
   // Safe setter for batch results to prevent objects from being set
   const setBatchResultsSafe = (newResults) => {
     console.log('Setting batch results:', newResults)
+    console.log('Type of newResults:', typeof newResults)
+    console.log('Is array:', Array.isArray(newResults))
+    console.log('Length:', newResults?.length)
     if (Array.isArray(newResults)) {
+      console.log('Setting batch results array with', newResults.length, 'items')
       setBatchResults(newResults)
     } else {
       console.error('Attempted to set non-array batch results:', newResults)
@@ -310,6 +314,9 @@ function App() {
       if (res.ok) {
         const data = await res.json()
         console.log('Refreshed results:', data)
+        console.log('Number of results received:', data.length)
+        console.log('First 5 results:', data.slice(0, 5))
+        console.log('Last 5 results:', data.slice(-5))
         setBatchResultsSafe(data)
       }
     } catch (error) {
@@ -679,7 +686,11 @@ function App() {
               <tbody>
                 {(() => {
                   console.log('Rendering batchResults:', batchResults)
-                  return (batchResults || []).map((r, idx) => {
+                  console.log('batchResults length:', batchResults?.length)
+                  console.log('batchResults type:', typeof batchResults)
+                  const resultsArray = batchResults || []
+                  console.log('resultsArray length:', resultsArray.length)
+                  return resultsArray.map((r, idx) => {
                   try {
                     // Ensure r is an object and not something else
                     if (!r || typeof r !== 'object') {
